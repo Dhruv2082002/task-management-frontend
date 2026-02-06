@@ -25,13 +25,22 @@ export function useTasks() {
     const createTask = async (taskData) => {
         // Optimistic update could be complex here due to ID from backend, so we'll await.
         try {
-            await client.post('/Tasks', taskData);
+            const requestId = crypto.randomUUID();
+            await client.post('/Tasks', taskData, {
+                headers: {
+                    'X-Request-ID': requestId
+                }
+            });
             toast.success('Task created successfully');
             fetchTasks();
             return true;
         } catch (error) {
             console.error(error);
-            toast.error('Failed to create task');
+            if (error.response && error.response.status === 409) {
+                toast.error('Duplicate request detected');
+            } else {
+                toast.error('Failed to create task');
+            }
             return false;
         }
     };
