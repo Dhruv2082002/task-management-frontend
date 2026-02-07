@@ -11,7 +11,7 @@ import clsx from 'clsx';
 // import { format } from 'date-fns'; // Not used in this snippet, using helper
 
 export default function Dashboard() {
-    const { tasks, loading, deleteTask, toggleComplete, refresh } = useTasks();
+    const { tasks, loading, deleteTask, toggleComplete, refresh, isTaskToggling } = useTasks();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
 
@@ -80,7 +80,11 @@ export default function Dashboard() {
                             <div className="flex items-start gap-3">
                                 <button
                                     onClick={() => toggleComplete(task)}
-                                    className="mt-1 flex-shrink-0 text-gray-400 hover:text-indigo-600 transition-colors focus:outline-none"
+                                    disabled={isTaskToggling(task.id)}
+                                    className={clsx(
+                                        "mt-1 flex-shrink-0 transition-colors focus:outline-none",
+                                        isTaskToggling(task.id) ? "cursor-not-allowed opacity-50" : "text-gray-400 hover:text-indigo-600"
+                                    )}
                                 >
                                     {task.isCompleted ? (
                                         <CheckCircle className="h-6 w-6 text-green-500" />

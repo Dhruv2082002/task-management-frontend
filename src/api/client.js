@@ -23,7 +23,11 @@ client.interceptors.response.use(
     (error) => {
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('token');
-            // Optionally redirect to login here
+
+            // Optionally redirect to login here if not at login page
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

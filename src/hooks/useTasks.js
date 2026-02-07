@@ -7,19 +7,45 @@ export function useTasks() {
     const [loading, setLoading] = useState(true);
 
     const fetchTasks = useCallback(async () => {
-        try {
-            const response = await client.get('/Tasks');
-            setTasks(response.data);
-        } catch (error) {
-            console.error('Failed to fetch tasks', error);
-            toast.error('Failed to load tasks');
-        } finally {
-            setLoading(false);
-        }
+        const controller = new AbortController();
+        
+        const fetchData = async () => {
+            try {
+                const response = await client.get('/Tasks', {
+                    signal: controller.signal
+                });
+                setTasks(response.data);
+            } catch (error) {
+                if (error.code !== "ERR_CANCELED") {
+                    console.error('Failed to fetch tasks', error);
+                    toast.error('Failed to load tasks');
+                }
+            } finally {
+                // Only set loading false if not canceled (component likely unmounted or new request started)
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchData();
+
+        return () => controller.abort();
     }, []);
 
     useEffect(() => {
-        fetchTasks();
+        const cleanup = fetchTasks();
+        // Since fetchTasks is async calling it directly in useEffect (and it returns a promise) is okay 
+        // IF we change fetchTasks to NOT handle the abort logic internally but return the abort function.
+        // HOWEVER, the pattern `useEffect(fetchTasks, [fetchTasks])` is existing. 
+        // The cleaner way is to let fetchTasks strictly be the function that runs.
+        
+        // Wait, fetchTasks is a useCallback dependency. The previous code was:
+        // useEffect(() => { fetchTasks(); }, [fetchTasks]);
+        
+        // My proposed change to fetchTasks above returns the cleanup function.
+        // So I should update this useEffect to:
+        return cleanup; 
     }, [fetchTasks]);
 
     const createTask = async (taskData) => {
@@ -59,7 +85,21 @@ export function useTasks() {
         }
     };
 
+    const [togglingTaskIds, setTogglingTaskIds] = useState(new Set());
+
+    const isTaskToggling = useCallback((taskId) => {
+        return togglingTaskIds.has(taskId);
+    }, [togglingTaskIds]);
+
     const toggleComplete = async (task) => {
+        if (togglingTaskIds.has(task.id)) return;
+
+        setTogglingTaskIds(prev => {
+            const newSet = new Set(prev);
+            newSet.add(task.id);
+            return newSet;
+        });
+
         const originalTask = { ...task };
         const updatedTask = { ...task, isCompleted: !task.isCompleted };
         
@@ -80,6 +120,12 @@ export function useTasks() {
             toast.error('Failed to update status');
             // Revert
             setTasks(prev => prev.map(t => t.id === task.id ? originalTask : t));
+        } finally {
+            setTogglingTaskIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(task.id);
+                return newSet;
+            });
         }
     };
 
@@ -101,6 +147,7 @@ export function useTasks() {
         updateTask,
         deleteTask,
         toggleComplete,
+        isTaskToggling,
         refresh: fetchTasks
     };
 }
